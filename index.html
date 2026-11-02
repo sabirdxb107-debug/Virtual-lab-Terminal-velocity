@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Terminal Velocity Lab</title>
+<style>
+:root{--bg:#f3f6f5;--panel:#fff;--ink:#17302f;--mute:#5d7472;--line:#cfdcda;--accent:#0b6e6e;--accent-ink:#fff;--warn:#a4510c;--gate:#c2410c;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1b1b;--panel:#172626;--ink:#e3efed;--mute:#93adaa;--line:#2b4241;--accent:#4cc3bd;--accent-ink:#06201f;--warn:#f0a35e;--gate:#ff9a5c}}
+:root[data-theme="dark"]{--bg:#0f1b1b;--panel:#172626;--ink:#e3efed;--mute:#93adaa;--line:#2b4241;--accent:#4cc3bd;--accent-ink:#06201f;--warn:#f0a35e;--gate:#ff9a5c}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:20px 16px 40px}
+h1{font:600 28px/1.2 Georgia,"Iowan Old Style",serif;margin:0 0 4px}
+.sub{color:var(--mute);margin:0 0 18px;max-width:64ch}
+.grid{display:grid;grid-template-columns:230px 1fr;gap:16px;align-items:start}
+@media(max-width:720px){.grid{grid-template-columns:1fr}}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+canvas{display:block;margin:0 auto;max-width:100%}
+h2{font:600 16px/1.3 Georgia,serif;margin:0 0 10px}
+.ctl{margin-bottom:12px}
+.ctl label{display:flex;justify-content:space-between;font-weight:600}
+.ctl output{font-variant-numeric:tabular-nums;color:var(--accent)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.hint{font-size:13px;color:var(--mute)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,select{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer}
+button.main{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600;padding:8px 20px}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.reads{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:12px 0}
+.reads div{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.reads span{display:block;font-size:12px;color:var(--mute)}
+.reads b{font-size:20px;font-variant-numeric:tabular-nums}
+.warn{color:var(--warn);font-size:13px;min-height:20px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{color:var(--mute);font-weight:600}
+.stack{display:grid;gap:16px}
+details{font-size:14px}
+summary{cursor:pointer;font-weight:600}
+code{background:var(--bg);padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Terminal Velocity Lab</h1>
+<p class="sub">Drop a sphere through a column of glycerine-like fluid. Change the radius, the density of the sphere or the viscosity of the fluid, time the fall between the two marks, and collect your own evidence for how terminal velocity depends on each one.</p>
+
+<div class="grid">
+  <div class="box"><canvas id="tank" width="210" height="520" style="width:210px;height:520px" aria-label="Fluid column with falling sphere"></canvas></div>
+
+  <div class="stack">
+    <div class="box">
+      <h2>Set up the experiment</h2>
+      <div class="ctl"><label for="r">Radius of sphere <output id="rO"></output></label><input id="r" type="range" min="1" max="6" step="0.5" value="2"></div>
+      <div class="ctl"><label for="rho">Density of sphere <output id="rhoO"></output></label><input id="rho" type="range" min="1500" max="11500" step="100" value="2500">
+        <div class="row" style="margin-top:6px"><button data-rho="2500">Glass</button><button data-rho="2700">Aluminium</button><button data-rho="7800">Steel</button><button data-rho="11340">Lead</button></div></div>
+      <div class="ctl"><label for="eta">Viscosity of fluid <output id="etaO"></output></label><input id="eta" type="range" min="0.1" max="1.5" step="0.05" value="0.8"></div>
+      <p class="hint">Fluid density is fixed at 1260 kg/m³. For a clean comparison, change one slider at a time.</p>
+      <div class="row">
+        <button class="main" id="drop">Drop sphere</button>
+        <label>Speed <select id="spd"><option value="1">Real time</option><option value="0.25">Slow motion ¼×</option><option value="0.05">Very slow 1/20×</option></select></label>
+        <label><input type="checkbox" id="noise" checked> Timing error (±5 ms)</label>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2>Measurements</h2>
+      <div class="reads">
+        <div><span>Stopwatch (A → B, 30 cm)</span><b id="sw">0.000 s</b></div>
+        <div><span>Measured v = 0.30 m ÷ t</span><b id="vm">–</b></div>
+      </div>
+      <div class="scroll"><table><thead><tr><th>#</th><th>r (mm)</th><th>ρ (kg/m³)</th><th>η (Pa·s)</th><th>t (s)</th><th>v measured (m/s)</th></tr></thead><tbody id="rows"></tbody></table></div>
+      <div class="row" style="margin-top:8px"><button id="clr">Clear table</button></div>
+    </div>
+
+    <div class="box">
+      <h2>Graph of your results</h2>
+      <div class="row" style="margin-bottom:8px"><label>Variable <select id="gv"><option value="r">Radius r</option><option value="d">Density of sphere ρ</option><option value="e">Viscosity η</option></select></label><label>Plot v against <select id="gt"><option value="1">x</option><option value="2">x²</option><option value="3">x³</option><option value="i">1/x</option><option value="i2">1/x²</option></select></label><label><input type="checkbox" id="gf"> Show line of best fit</label></div>
+      <canvas id="gr" width="560" height="260" style="width:100%;max-width:560px;height:auto" aria-label="Graph of measured velocity"></canvas>
+      <p class="hint" id="gnote">Run at least two drops that differ in only the variable you are plotting.</p>
+    </div>
+
+    <div class="box"><h2>Your task</h2><p class="hint" style="margin:0">For each of the three variables, keep the other two fixed, take readings at 5 or more values, and plot a graph. Try different ways of plotting until the points fall on a straight line, then state the relationship you found and how well your evidence supports it.</p></div>
+  </div>
+</div>
+</div>
+
+<script>
+(function(){
+var G=9.81,SIG=1260,H=0.5,A=0.1,B=0.4;
+var $=function(i){return document.getElementById(i)};
+var rS=$('r'),rhoS=$('rho'),etaS=$('eta');
+var trials=[],sim=null,last=0,raf=0;
+function P(){return{r:+rS.value/1000,rho:+rhoS.value,eta:+etaS.value}}
+function vt(p){return 2*p.r*p.r*(p.rho-SIG)*G/(9*p.eta)}
+function tau(p){return 2*p.rho*p.r*p.r/(9*p.eta)}
+function yAt(p,t){var v=vt(p),k=tau(p);return v*(t-k*(1-Math.exp(-t/k)))}
+function tAt(p,y){var lo=0,hi=y/vt(p)+tau(p);for(var i=0;i<60;i++){var m=(lo+hi)/2;yAt(p,m)<y?lo=m:hi=m}return(lo+hi)/2}
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+function gauss(){return(Math.random()+Math.random()+Math.random()-1.5)*2}
+function labels(){var p=P();$('rO').textContent=(p.r*1000).toFixed(1)+' mm';$('rhoO').textContent=p.rho+' kg/m³';$('etaO').textContent=p.eta.toFixed(2)+' Pa·s';
+  }
+
+/* ---- tank drawing ---- */
+var tk=$('tank'),tc=tk.getContext('2d'),dpr=window.devicePixelRatio||1;
+tk.width=210*dpr;tk.height=520*dpr;tc.scale(dpr,dpr);
+var X0=70,X1=140,Y0=40,Y1=500,HP=Y1-Y0;
+function drawTank(y,tsw){
+  var p=P(),ink=css('--ink'),mute=css('--mute'),gate=css('--gate');
+  tc.clearRect(0,0,210,520);
+  var hue=190-(p.eta-0.1)/1.4*150;
+  tc.fillStyle='hsla('+hue+',70%,50%,.30)';tc.fillRect(X0,Y0-14,X1-X0,Y1-Y0+14);
+  tc.strokeStyle=ink;tc.lineWidth=2;tc.beginPath();tc.moveTo(X0,Y0-30);tc.lineTo(X0,Y1);tc.lineTo(X1,Y1);tc.lineTo(X1,Y0-30);tc.stroke();
+  tc.font='11px system-ui';tc.fillStyle=mute;tc.textAlign='right';tc.lineWidth=1;
+  for(var c=0;c<=50;c+=5){var yy=Y0+c/50*HP;tc.strokeStyle=mute;tc.beginPath();tc.moveTo(X0,yy);tc.lineTo(X0+(c%10?6:12),yy);tc.stroke();if(c%10===0)tc.fillText(c+' cm',X0-6,yy+4)}
+  [[A,'A'],[B,'B']].forEach(function(g){var yy=Y0+g[0]/H*HP;tc.strokeStyle=gate;tc.lineWidth=2;tc.setLineDash([5,3]);tc.beginPath();tc.moveTo(X0-4,yy);tc.lineTo(X1+4,yy);tc.stroke();tc.setLineDash([]);tc.fillStyle=gate;tc.textAlign='left';tc.font='bold 13px system-ui';tc.fillText(g[1],X1+8,yy+4)});
+  var br=4+p.r*1000*2.2,by=Y0+Math.min(y,H)/H*HP,l=Math.round(75-(p.rho-1500)/10000*55);
+  tc.fillStyle='hsl(210,8%,'+l+'%)';tc.strokeStyle=ink;tc.lineWidth=1.5;tc.beginPath();tc.arc((X0+X1)/2,by,br,0,6.283);tc.fill();tc.stroke();
+  tc.fillStyle=mute;tc.font='11px system-ui';tc.textAlign='center';tc.fillText('sphere not to scale',105,516);
+}
+
+/* ---- run ---- */
+function frame(now){
+  var dt=Math.min((now-last)/1000,0.05)*sim.speed;last=now;sim.t+=dt;
+  var y=yAt(sim.p,sim.t),sw=0;
+  if(sim.t>=sim.tA)sw=Math.min(sim.t,sim.tB)-sim.tA;
+  drawTank(y,sw);$('sw').textContent=sw.toFixed(3)+' s';
+  if(sim.t>=sim.tEnd){finish();return}
+  raf=requestAnimationFrame(frame);
+}
+function drop(){
+  cancelAnimationFrame(raf);var p=P();
+  sim={p:p,t:0,speed:+$('spd').value,tA:tAt(p,A),tB:tAt(p,B),tEnd:tAt(p,H)};
+  $('drop').disabled=true;$('vm').textContent='–';last=performance.now();raf=requestAnimationFrame(frame);
+}
+function finish(){
+  var p=sim.p,t=sim.tB-sim.tA;if($('noise').checked)t=Math.max(0.001,t+gauss()*0.005);
+  t=Math.round(t*1000)/1000;var v=(B-A)/t;
+  $('sw').textContent=t.toFixed(3)+' s';$('vm').textContent=v.toFixed(3)+' m/s';
+  trials.push({r:p.r*1000,rho:p.rho,eta:p.eta,t:t,v:v,vs:vt(p)});
+  $('drop').disabled=false;drawTank(H,0);render();
+}
+function render(){
+  $('rows').innerHTML=trials.map(function(x,i){return'<tr><td>'+(i+1)+'</td><td>'+x.r.toFixed(1)+'</td><td>'+x.rho+'</td><td>'+x.eta.toFixed(2)+'</td><td>'+x.t.toFixed(3)+'</td><td>'+x.v.toFixed(3)+'</td></tr>'}).join('');
+  graph();
+}
+
+/* ---- graph ---- */
+var gc=$('gr'),gx=gc.getContext('2d');gc.width=560*dpr;gc.height=260*dpr;gx.scale(dpr,dpr);
+function graph(){
+  var mode=$('gv').value,tf=$('gt').value,ink=css('--ink'),mute=css('--mute'),acc=css('--accent'),line=css('--line');
+  gx.clearRect(0,0,560,260);
+  var L=trials[trials.length-1],pts=[];
+  if(L){trials.forEach(function(t){
+    var same={r:t.rho===L.rho&&t.eta===L.eta,d:t.r===L.r&&t.eta===L.eta,e:t.r===L.r&&t.rho===L.rho}[mode];
+    if(same){var b=mode==='r'?t.r:mode==='d'?t.rho:t.eta;var x={'1':b,'2':b*b,'3':b*b*b,'i':1/b,'i2':1/(b*b)}[tf];pts.push({x:x,y:t.v})}})}
+  var nm={r:'r',d:'ρ',e:'η'}[mode];var lab={'1':nm,'2':nm+'²','3':nm+'³','i':'1/'+nm,'i2':'1/'+nm+'²'}[tf];
+  var ml=56,mr=14,mt=12,mb=40,w=560-ml-mr,h=260-mt-mb;
+  var xm=Math.max.apply(null,pts.map(function(p){return p.x}).concat([1e-9]))*1.1,ym=Math.max.apply(null,pts.map(function(p){return p.y}).concat([1e-9]))*1.15;
+  gx.strokeStyle=ink;gx.lineWidth=1.5;gx.beginPath();gx.moveTo(ml,mt);gx.lineTo(ml,mt+h);gx.lineTo(ml+w,mt+h);gx.stroke();
+  gx.font='12px system-ui';gx.fillStyle=mute;gx.textAlign='center';gx.fillText(lab,ml+w/2,255);
+  gx.save();gx.translate(14,mt+h/2);gx.rotate(-Math.PI/2);gx.fillText('v (m/s)',0,0);gx.restore();
+  for(var i=0;i<=4;i++){var fy=mt+h-i/4*h,fx=ml+i/4*w;gx.strokeStyle=line;gx.lineWidth=1;gx.beginPath();gx.moveTo(ml,fy);gx.lineTo(ml+w,fy);gx.stroke();
+    gx.fillStyle=mute;gx.textAlign='right';gx.fillText((ym*i/4).toFixed(2),ml-6,fy+4);gx.textAlign='center';gx.fillText((xm*i/4).toPrecision(2),fx,mt+h+16)}
+  var r2=null;
+  if(pts.length>=3){var n=pts.length,sx=0,sy=0,sxy=0,sxx=0,syy=0;pts.forEach(function(p){sx+=p.x;sy+=p.y;sxy+=p.x*p.y;sxx+=p.x*p.x;syy+=p.y*p.y});
+    var dn=n*sxx-sx*sx,dy=n*syy-sy*sy;
+    if(dn>0&&dy>0){var k=(n*sxy-sx*sy)/dn,c=(sy-k*sx)/n;r2=Math.pow(n*sxy-sx*sy,2)/(dn*dy);
+      if($('gf').checked){gx.save();gx.beginPath();gx.rect(ml,mt,w,h);gx.clip();gx.strokeStyle=acc;gx.lineWidth=1.5;gx.setLineDash([6,4]);gx.beginPath();gx.moveTo(ml,mt+h-c/ym*h);gx.lineTo(ml+w,mt+h-(c+k*xm)/ym*h);gx.stroke();gx.restore()}}}
+  gx.fillStyle=acc;pts.forEach(function(p){gx.beginPath();gx.arc(ml+p.x/xm*w,mt+h-p.y/ym*h,4.5,0,6.283);gx.fill()});
+  $('gnote').textContent=pts.length>=3?pts.length+' drops with the other two variables held constant.'+($('gf').checked&&r2!==null?' Straightness of fit R² = '+r2.toFixed(3)+' (closer to 1 means a straighter line).':''):
+    'Run at least three drops that change only the variable you are plotting.';
+}
+
+[rS,rhoS,etaS].forEach(function(e){e.addEventListener('input',function(){labels();if(!sim||!$('drop').disabled)drawTank(0,0)})});
+document.querySelectorAll('[data-rho]').forEach(function(b){b.onclick=function(){rhoS.value=b.dataset.rho;labels();drawTank(0,0)}});
+$('drop').onclick=drop;$('gv').onchange=graph;$('gt').onchange=graph;$('gf').onchange=graph;
+$('clr').onclick=function(){trials=[];render()};
+window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change',function(){drawTank(0,0);graph()});
+labels();drawTank(0,0);graph();
+})();
+</script>
+</body>
+</html>
